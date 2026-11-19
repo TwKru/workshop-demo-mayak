@@ -88,4 +88,17 @@
       status.textContent = 'Текст выделен: нажмите Ctrl+C, чтобы скопировать.';
     }
   });
+  const mobileBar = document.querySelector('.mobile-call');
+  const bookingSection = document.querySelector('#booking');
+  if (mobileBar && bookingSection && 'IntersectionObserver' in window) {
+    const syncMobileBar = () => {
+      const bounds = bookingSection.getBoundingClientRect();
+      mobileBar.hidden = bounds.top < window.innerHeight && bounds.bottom > 0;
+    };
+    syncMobileBar();
+    const bookingObserver = new IntersectionObserver(entries => {
+      mobileBar.hidden = entries[0].isIntersecting;
+    });
+    bookingObserver.observe(bookingSection);
+  }
 })();
