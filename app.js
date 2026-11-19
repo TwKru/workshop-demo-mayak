@@ -91,14 +91,58 @@
   const mobileBar = document.querySelector('.mobile-call');
   const bookingSection = document.querySelector('#booking');
   if (mobileBar && bookingSection && 'IntersectionObserver' in window) {
+    const setMobileBarHidden = hidden => {
+      mobileBar.classList.toggle('mobile-call--hidden', hidden);
+      mobileBar.inert = hidden;
+      mobileBar.setAttribute('aria-hidden', String(hidden));
+    };
     const syncMobileBar = () => {
       const bounds = bookingSection.getBoundingClientRect();
-      mobileBar.hidden = bounds.top < window.innerHeight && bounds.bottom > 0;
+      setMobileBarHidden(bounds.top < window.innerHeight && bounds.bottom > 0);
     };
     syncMobileBar();
     const bookingObserver = new IntersectionObserver(entries => {
-      mobileBar.hidden = entries[0].isIntersecting;
+      setMobileBarHidden(entries[0].isIntersecting);
     });
     bookingObserver.observe(bookingSection);
   }
+  let scrollFrame = 0;
+  const cancelSectionScroll = () => { cancelAnimationFrame(scrollFrame); scrollFrame = 0; };
+  window.addEventListener('wheel', cancelSectionScroll, {passive:true});
+  window.addEventListener('touchstart', cancelSectionScroll, {passive:true});
+  window.addEventListener('keydown', event => {
+    if (['ArrowUp','ArrowDown','PageUp','PageDown','Home','End','Escape'].includes(event.key)) cancelSectionScroll();
+  });
+  document.addEventListener('click', event => {
+    const link = event.target.closest?.('a[href^="#"]');
+    if (!link || event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
+    const target = link.hash ? document.getElementById(decodeURIComponent(link.hash.slice(1))) : document.documentElement;
+    if (!target) return;
+    event.preventDefault();
+    cancelSectionScroll();
+    const start = window.scrollY;
+    const offset = parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0;
+    const maximum = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+    const finish = Math.min(maximum, Math.max(0, start + target.getBoundingClientRect().top - offset));
+    if (location.hash !== link.hash) history.pushState(null, '', link.hash || location.pathname + location.search);
+    const focusTarget = () => {
+      if (target !== document.documentElement) {
+        if (!target.hasAttribute('tabindex')) target.setAttribute('tabindex','-1');
+        target.focus({preventScroll:true});
+      }
+    };
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches || Math.abs(finish-start) < 2) {
+      window.scrollTo({top:finish,behavior:'instant'}); focusTarget(); return;
+    }
+    const duration = Math.min(700, Math.max(300, Math.abs(finish-start)*0.08));
+    const began = performance.now();
+    const step = now => {
+      const progress = Math.min(1, (now-began)/duration);
+      const eased = progress < 0.5 ? 4*progress*progress*progress : 1-Math.pow(-2*progress+2,3)/2;
+      window.scrollTo({top:start+(finish-start)*eased,behavior:'instant'});
+      if (progress < 1) scrollFrame = requestAnimationFrame(step);
+      else { scrollFrame=0; focusTarget(); }
+    };
+    scrollFrame = requestAnimationFrame(step);
+  });
 })();
